@@ -47,16 +47,14 @@ from setuptools import Extension, setup, find_packages
 def is_new_osx():
     """Check whether we're on OSX >= 10.10"""
     name = distutils.util.get_platform()
-    if sys.platform != "darwin":
+    if (
+        sys.platform != "darwin"
+        or sys.platform == "darwin"
+        and not name.startswith("macosx-10")
+    ):
         return False
-    elif name.startswith("macosx-10"):
-        minor_version = int(name.split("-")[1].split(".")[1])
-        if minor_version >= 7:
-            return True
-        else:
-            return False
-    else:
-        return False
+    minor_version = int(name.split("-")[1].split(".")[1])
+    return minor_version >= 7
 
 
 PACKAGE_DATA = {'': ['*.pyx', '*.pxd'],
@@ -191,8 +189,8 @@ def setup_package():
             if sys.platform == 'darwin':
                 dylib_path = ['..' for _ in range(mod_name.count('.'))]
                 dylib_path = '/'.join(dylib_path)
-                dylib_path = '@loader_path/%s/neuralcoref/platform/darwin/lib' % dylib_path
-                extra_link_args.append('-Wl,-rpath,%s' % dylib_path)
+                dylib_path = f'@loader_path/{dylib_path}/neuralcoref/platform/darwin/lib'
+                extra_link_args.append(f'-Wl,-rpath,{dylib_path}')
             ext_modules.append(
                 Extension(mod_name, [mod_path],
                     language='c++', include_dirs=include_dirs,

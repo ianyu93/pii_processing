@@ -172,7 +172,7 @@ def load_file(full_name, debug=False):
                 if tokens:
                     if debug:
                         print("End of utterance")
-                    utts_text.append("".join(t + " " for t in tokens))
+                    utts_text.append("".join(f"{t} " for t in tokens))
                     utts_tokens.append(tokens)
                     utts_speakers.append(speaker)
                     utts_corefs.append(corefs)
@@ -181,49 +181,44 @@ def load_file(full_name, debug=False):
                     index = 0
                     speaker = ""
                     continue
-            # End of doc
             elif len(cols) == 2:
                 if debug:
                     print("End of doc")
-                if cols[0] == "#end":
-                    if debug:
-                        print("Saving doc")
-                    docs.append(
-                        (utts_text, utts_tokens, utts_corefs, utts_speakers, name, part)
-                    )
-                    utts_text = []
-                    utts_tokens = []
-                    utts_corefs = []
-                    utts_speakers = []
-                else:
-                    raise ValueError("Error on end line " + line)
-            # New doc
+                if cols[0] != "#end":
+                    raise ValueError(f"Error on end line {line}")
+                if debug:
+                    print("Saving doc")
+                docs.append(
+                    (utts_text, utts_tokens, utts_corefs, utts_speakers, name, part)
+                )
+                utts_text = []
+                utts_tokens = []
+                utts_corefs = []
+                utts_speakers = []
             elif len(cols) == 5:
                 if debug:
                     print("New doc")
-                if cols[0] == "#begin":
-                    name = re.match(r"\((.*)\);", cols[2]).group(1)
-                    try:
-                        part = cols[4]
-                    except ValueError:
-                        print("Error parsing document part " + line)
-                    if debug:
-                        print("New doc", name, part, name[:2])
-                    tokens = []
-                    corefs = []
-                    index = 0
-                else:
-                    raise ValueError("Error on begin line " + line)
-            # Inside utterance
+                if cols[0] != "#begin":
+                    raise ValueError(f"Error on begin line {line}")
+                name = re.match(r"\((.*)\);", cols[2])[1]
+                try:
+                    part = cols[4]
+                except ValueError:
+                    print(f"Error parsing document part {line}")
+                if debug:
+                    print("New doc", name, part, name[:2])
+                tokens = []
+                corefs = []
+                index = 0
             elif len(cols) > 7:
                 if debug:
                     print("Inside utterance")
-                assert cols[0] == name and int(cols[1]) == int(part), (
-                    "Doc name or part error " + line
-                )
-                assert int(cols[2]) == index, "Index error on " + line
+                assert cols[0] == name and int(cols[1]) == int(
+                    part
+                ), f"Doc name or part error {line}"
+                assert int(cols[2]) == index, f"Index error on {line}"
                 if speaker:
-                    assert cols[9] == speaker, "Speaker changed in " + line + speaker
+                    assert cols[9] == speaker, f"Speaker changed in {line}{speaker}"
                 else:
                     speaker = cols[9]
                     if debug:
@@ -233,26 +228,22 @@ def load_file(full_name, debug=False):
                     if debug:
                         print("coref_expr", coref_expr)
                     if not coref_expr:
-                        raise ValueError("Coref expression empty " + line)
+                        raise ValueError(f"Coref expression empty {line}")
                     for tok in coref_expr:
                         if debug:
                             print("coref tok", tok)
                         try:
                             match = re.match(r"^(\(?)(\d+)(\)?)$", tok)
                         except:
-                            print("error getting coreferences for line " + line)
-                        assert match is not None, (
-                            "Error parsing coref " + tok + " in " + line
-                        )
-                        num = match.group(2)
-                        assert num is not "", (
-                            "Error parsing coref " + tok + " in " + line
-                        )
-                        if match.group(1) == "(":
+                            print(f"error getting coreferences for line {line}")
+                        assert match is not None, f"Error parsing coref {tok} in {line}"
+                        num = match[2]
+                        assert num is not "", f"Error parsing coref {tok} in {line}"
+                        if match[1] == "(":
                             if debug:
                                 print("New coref", num)
                             corefs.append({"label": num, "start": index, "end": None})
-                        if match.group(3) == ")":
+                        if match[3] == ")":
                             j = None
                             for i in range(len(corefs) - 1, -1, -1):
                                 if debug:
@@ -263,14 +254,14 @@ def load_file(full_name, debug=False):
                                 ):
                                     j = i
                                     break
-                            assert j is not None, "coref closing error " + line
+                            assert j is not None, f"coref closing error {line}"
                             if debug:
                                 print("End coref", num)
                             corefs[j]["end"] = index
                 tokens.append(clean_token(cols[3]))
                 index += 1
             else:
-                raise ValueError("Line not standard " + line)
+                raise ValueError(f"Line not standard {line}")
     return docs
 
 
@@ -323,8 +314,8 @@ class ConllDoc(Document):
         Output: list[conll_index] => list of associated spacy tokens (assume spacy tokenizer has a finer granularity)
         """
         lookup = []
-        c_iter = (t for t in conll_tokens)
-        s_iter = enumerate(t for t in spacy_tokens)
+        c_iter = iter(conll_tokens)
+        s_iter = enumerate(spacy_tokens)
         i, s_tok = next(s_iter)
         for c_tok in c_iter:
             # if debug: print("conll", c_tok, "spacy", s_tok, "index", i)
@@ -348,8 +339,15 @@ class ConllDoc(Document):
         # Convert conll tokens coref index in spacy tokens indexes
         identified_gold = [False] * len(corefs)
         for coref in corefs:
-            missing_values = [key for key in ['label', 'start', 'end', ] if coref.get(key, None) is None]
-            if missing_values:
+            if missing_values := [
+                key
+                for key in [
+                    'label',
+                    'start',
+                    'end',
+                ]
+                if coref.get(key, None) is None
+            ]:
                 found_values = {key: coref[key] for key in ['label', 'start', 'end'] if coref.get(key, None) is not None}
                 raise Exception(f"Coref {self.name} with fields {found_values} has empty values for the keys {missing_values}.")
 
@@ -425,7 +423,7 @@ class ConllDoc(Document):
         if not compressed:
             _, features = self.get_single_mention_features(mention)
             return features[np.newaxis, :]
-        feat_l = [
+        return [
             mention.features_["01_MentionType"],
             mention.features_["02_MentionLength"],
             mention.index,
@@ -433,7 +431,6 @@ class ConllDoc(Document):
             mention.features_["04_IsMentionNested"],
             self.genre_,
         ]
-        return feat_l
 
     def get_pair_mentions_features_conll(self, m1, m2, compressed=True):
         """ Compressed or not single mention features"""
@@ -441,7 +438,7 @@ class ConllDoc(Document):
             _, features = self.get_pair_mentions_features(m1, m2)
             return features[np.newaxis, :]
         features_, _ = self.get_pair_mentions_features(m1, m2)
-        feat_l = [
+        return [
             features_["00_SameSpeaker"],
             features_["01_AntMatchMentionSpeaker"],
             features_["02_MentionMatchSpeaker"],
@@ -452,7 +449,6 @@ class ConllDoc(Document):
             features_["07_MentionDistance"],
             features_["08_Overlapping"],
         ]
-        return feat_l
 
     def get_feature_array(self, doc_id, feature=None, compressed=True, debug=False):
         """
@@ -486,7 +482,7 @@ class ConllDoc(Document):
         n_mentions = 0
         total_pairs = 0
         if debug:
-            print("mentions", self.mentions, str([m.gold_label for m in self.mentions]))
+            print("mentions", self.mentions, [m.gold_label for m in self.mentions])
         for mention_idx, antecedents_idx in list(
             self.get_candidate_pairs(max_distance=None, max_distance_with_match=None)
         ):
@@ -511,20 +507,21 @@ class ConllDoc(Document):
             )
             ants = [self.mentions[ant_idx] for ant_idx in antecedents_idx]
             no_antecedent = (
-                not any(ant.gold_label == mention.gold_label for ant in ants)
+                all(ant.gold_label != mention.gold_label for ant in ants)
                 or mention.gold_label is None
             )
             if antecedents_idx:
-                pairs_ant_idx += [idx for idx in antecedents_idx]
+                pairs_ant_idx += list(antecedents_idx)
                 pairs_features += [
                     self.get_pair_mentions_features_conll(ant, mention, compressed)
                     for ant in ants
                 ]
                 ant_labels = (
-                    [0 for ant in ants]
+                    [0 for _ in ants]
                     if no_antecedent
                     else [
-                        1 if ant.gold_label == mention.gold_label else 0 for ant in ants
+                        1 if ant.gold_label == mention.gold_label else 0
+                        for ant in ants
                     ]
                 )
                 pairs_labels += ant_labels
@@ -540,9 +537,9 @@ class ConllDoc(Document):
             FEATURES_NAMES[3]: mentions_pairs_start,
             FEATURES_NAMES[4]: mentions_spans,
             FEATURES_NAMES[5]: mentions_words,
-            FEATURES_NAMES[6]: pairs_ant_idx if pairs_ant_idx else None,
-            FEATURES_NAMES[7]: pairs_features if pairs_features else None,
-            FEATURES_NAMES[8]: pairs_labels if pairs_labels else None,
+            FEATURES_NAMES[6]: pairs_ant_idx or None,
+            FEATURES_NAMES[7]: pairs_features or None,
+            FEATURES_NAMES[8]: pairs_labels or None,
             FEATURES_NAMES[9]: [mentions_location],
             FEATURES_NAMES[10]: [self.conll_tokens],
             FEATURES_NAMES[11]: [self.conll_lookup],
@@ -550,8 +547,8 @@ class ConllDoc(Document):
                 {
                     "name": self.name,
                     "part": self.part,
-                    "utterances": list(str(u) for u in self.utterances),
-                    "mentions": list(str(m) for m in self.mentions),
+                    "utterances": [str(u) for u in self.utterances],
+                    "mentions": [str(m) for m in self.mentions],
                 }
             ],
         }
@@ -565,13 +562,7 @@ class ConllDoc(Document):
 ###################
 ### ConllCorpus #####
 class ConllCorpus(object):
-    def __init__(
-        self,
-        n_jobs=4,
-        embed_path=PACKAGE_DIRECTORY + "/weights/",
-        gold_mentions=False,
-        blacklist=False,
-    ):
+    def __init__(self, n_jobs=4, embed_path=f"{PACKAGE_DIRECTORY}/weights/", gold_mentions=False, blacklist=False):
         self.n_jobs = n_jobs
         self.features = {}
         self.utts_text = []

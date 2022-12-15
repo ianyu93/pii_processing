@@ -111,7 +111,7 @@ class Coref(object):
         Clean up and prepare one cluster for each mention
         """
         self.mention_to_cluster = list(range(len(self.data.mentions)))
-        self.clusters = dict((i, [i]) for i in self.mention_to_cluster)
+        self.clusters = {i: [i] for i in self.mention_to_cluster}
         self.mentions_single_scores = {}
         self.mentions_pairs_scores = {}
         for mention in self.mention_to_cluster:
@@ -308,8 +308,8 @@ class Coref(object):
                             in_coref = coref_original
                             resolved_utt += coref_replace.text.lower()
                             break
-                    if in_coref is None:
-                        resolved_utt += token.text_with_ws
+                if in_coref is None:
+                    resolved_utt += token.text_with_ws
                 if in_coref is not None and token == in_coref[-1]:
                     resolved_utt += (
                         " " if token.whitespace_ and resolved_utt[-1] is not " " else ""
@@ -385,12 +385,15 @@ class Coref(object):
             representative = self.data.mentions[key]
             for mention_idx in mentions[1:]:
                 mention = self.data.mentions[mention_idx]
-                if mention.mention_type is not representative.mention_type:
-                    if mention.mention_type == MENTION_TYPE["PROPER"] or (
+                if mention.mention_type is not representative.mention_type and (
+                    mention.mention_type == MENTION_TYPE["PROPER"]
+                    or (
                         mention.mention_type == MENTION_TYPE["NOMINAL"]
-                        and representative.mention_type == MENTION_TYPE["PRONOMINAL"]
-                    ):
-                        coreferences[self.data.mentions[key]] = mention
-                        representative = mention
+                        and representative.mention_type
+                        == MENTION_TYPE["PRONOMINAL"]
+                    )
+                ):
+                    coreferences[self.data.mentions[key]] = mention
+                    representative = mention
 
         return coreferences

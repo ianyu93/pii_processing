@@ -40,10 +40,10 @@ class AllResource(object):
                     for cluster in doc._.coref_clusters
                     for mention in cluster.mentions
                 ]
-                clusters = list(
-                    list(span.text for span in cluster)
+                clusters = [
+                    [span.text for span in cluster]
                     for cluster in doc._.coref_clusters
-                )
+                ]
                 resolved = doc._.coref_resolved
                 self.response["mentions"] = mentions
                 self.response["clusters"] = clusters

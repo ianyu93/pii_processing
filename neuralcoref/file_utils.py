@@ -48,7 +48,7 @@ def url_to_filename(url, etag=None):
     if etag:
         etag_bytes = etag.encode("utf-8")
         etag_hash = sha256(etag_bytes)
-        filename += "." + etag_hash.hexdigest()
+        filename += f".{etag_hash.hexdigest()}"
 
     return filename
 
@@ -65,7 +65,7 @@ def filename_to_url(filename, cache_dir=None):
     if not os.path.exists(cache_path):
         raise EnvironmentError(f"file {cache_path} not found")
 
-    meta_path = cache_path + ".json"
+    meta_path = f"{cache_path}.json"
     if not os.path.exists(meta_path):
         raise EnvironmentError(f"file {meta_path} not found")
 
@@ -216,7 +216,7 @@ def get_from_cache(url, cache_dir=None):
 
             logger.info("creating metadata file for %s", cache_path)
             meta = {"url": url, "etag": etag}
-            meta_path = cache_path + ".json"
+            meta_path = f"{cache_path}.json"
             with open(meta_path, "w", encoding="utf-8") as meta_file:
                 json.dump(meta, meta_file)
 

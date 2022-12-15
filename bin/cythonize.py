@@ -38,7 +38,7 @@ HASH_FILE = "cythonize.json"
 
 
 def process_pyx(fromfile, tofile):
-    print("Processing %s" % fromfile)
+    print(f"Processing {fromfile}")
     try:
         from Cython.Compiler.Version import version as cython_version
         from distutils.version import LooseVersion
@@ -106,7 +106,7 @@ def get_hash(path):
 
 def hash_changed(base, path, db):
     full_path = os.path.normpath(os.path.join(base, path))
-    return not get_hash(full_path) == db.get(full_path)
+    return get_hash(full_path) != db.get(full_path)
 
 
 def hash_add(base, path, db):
@@ -116,13 +116,13 @@ def hash_add(base, path, db):
 
 def process(base, filename, db):
     root, ext = os.path.splitext(filename)
-    if ext in [".pyx", ".cpp"]:
-        if hash_changed(base, filename, db) or not os.path.isfile(
-            os.path.join(base, root + ".cpp")
-        ):
-            preserve_cwd(base, process_pyx, root + ".pyx", root + ".cpp")
-            hash_add(base, root + ".cpp", db)
-            hash_add(base, root + ".pyx", db)
+    if ext in [".pyx", ".cpp"] and (
+        hash_changed(base, filename, db)
+        or not os.path.isfile(os.path.join(base, f"{root}.cpp"))
+    ):
+        preserve_cwd(base, process_pyx, f"{root}.pyx", f"{root}.cpp")
+        hash_add(base, f"{root}.cpp", db)
+        hash_add(base, f"{root}.pyx", db)
 
 
 def check_changes(root, db):

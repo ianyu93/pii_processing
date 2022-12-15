@@ -50,59 +50,56 @@ def stem(s):
   return s
 
 def save_enron_line(l2, prev, o):
-        l2 = remove_html_tags(l2)
-        l2 = l2.split('-----Original Message-----')[0].strip()
-        l2 = l2.split('---------------------- Forwarded')[0].strip()
-        l2 = l2.split('----- Forwarded')[0].strip()
-        l2 = l2.split('---------From:')[0].strip()
-        l2 = l2.split('**********************************************************************This')[0].strip()
-        l2 = l2.split('**********************************************************************   This')[0].strip()
-        l2 = l2.split('******************************************************************This')[0].strip()
-        l2 = l2.split('*************************************************This')[0].strip()
-        l2 = l2.split('********************************************************************** This')[0].strip()
-        l2 = l2.split('--------- Inline attachment follows')[0].strip()
-        l2 = l2.split('The information contained in this e-mail message and')[0].strip()
-        l2 = l2.split('This message is for the designated recipient')[0].strip()
-        l2 = l2.split('***Please be advised')[0].strip()
-        l2 = l2.split('*******This message')[0].strip()
-        l2 = l2.split('This message (including any attachments) contains')[0].strip()
-        l2 = l2.split('*********************************************************')[0].strip()
-        l2 = l2.split('_________________________________________________________________Get')[0].strip()
-        l2 = l2.split('___________________________________________')[0].strip()
-        l2 = l2.split('__________________________________________________ Do')[0].strip()
-        l2 = l2.replace("\\\"", " \" ").replace("(", " (").replace(")", ") ").replace("[", " [").replace("]", "] ").replace("?", "? ").replace("!", "! ").replace("? ?", "??").replace("! !", "!!").replace(":", ": ").replace("\t", " ").replace("= ", "").replace("=20","").replace("=90","").replace("=018","").replace("=09","").replace("=3D","")
-        l2 = l2.replace(" s ", " 's ").replace(" ve ", " 've ").replace(" re ", " 're ").replace(" ll ", " 'll ").replace(" m ", " 'm ").replace(" t ", " 't ").replace(" d ", " 'd ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace(". . .", "...")
-        l2 = l2.replace(". yahoo", ".yahoo").replace("www. ", "www.").replace(". htm", ".htm").replace(". co", ".co").replace(". org", ".org").replace(". edu", ".edu").replace(". net", ".net").replace(". NET", ".NET").replace(". CO", ".CO").replace(". ORG", ".ORG").replace(". EDU", ".EDU").replace(": //", "://")
-        l2 = l2.replace(": 0", ":0").replace(": 1", ":1").replace(": 2", ":2").replace(": 3", ":3").replace(": 4", ":4").replace(": 5", ":5").replace(": 6", ":6").replace(": 7", ":7").replace(": 8", ":8").replace(": 9", ":9")
-        l2 = l2.replace(". url -", ".url - <<").replace(". doc -", ".doc - <<").replace(". pdf -", ".pdf <<").replace(". xls -", ".xls <<").replace(". url", ".url>>").replace(". doc", ".doc>>").replace(". pdf", ".pdf>>").replace(". xls", ".xls>>").replace("<< ", "<<").replace("> >", " ").replace("  ", " ")
-        l2 = l2.replace(". URL -", ".URL - <<").replace(". DOC -", ".DOC - <<").replace(". PDF -", ".PDF <<").replace(". XLS -", ".xls <<").replace(". URL", ".URL>>").replace(". DOC", ".DOC>>").replace(". PDF", ".PDF>>").replace(". XLS", ".XLS>>").replace("<< ", "<<").replace("> >", " ").replace("  ", " ")
-        l2 = l2.replace("RE:", "").replace("Re:", "").replace("RE: ", "").replace("Re: ", "").replace("Fw: ", "").replace("FW: ", "").replace("FWD: ", "").replace("Fwd: ", "")
-        l2 = l2.replace('Importance: High',':')
-        if "Sent:" in l2: return
-        l2 = l2.replace("...", "... ").replace("\"\"", " \" ").replace("  ", " ").strip(" -:;[]()\=<>\"").rstrip(".!?")
-        l2Arr = l2.split()
-        if len(l2Arr) > 3:
-          l2 = " ".join(itertools.chain(*[camel_case_split(a) for a in l2Arr]))
-          if l2.replace(":", "").replace("[", "").replace("]", "").replace(".", "").replace("!", "").replace("?", "").replace(",", "").replace("-", "").replace(";", "").replace(" ", "").lower() in prev: return
-          l2 = l2.replace("==", "--")
-          l2 = l2.replace("++", "--")
-          l2 = l2.replace("*~", "--")
-          l2 = l2.replace("||", "--")
-          l2 = l2.replace("**", "--")
-          l2 = l2.replace("__", "--")
-          l2 = l2.replace("##", "--")
-          for l3 in l2.split('--'):
-            l3 = l3.strip()
-            if l3:
-              for l4 in l3.split("Subject: "):
-                l4 = l4.strip('=, ')
-                if l4: o.write(l4+"\tenron\n")
-          prev[l2.replace(":", "").replace("[", "").replace("]", "").replace(".", "").replace("!", "").replace("?", "").replace(",", "").replace("-", "").replace(";", "").replace(" ", "").lower()] = 1
+    l2 = remove_html_tags(l2)
+    l2 = l2.split('-----Original Message-----')[0].strip()
+    l2 = l2.split('---------------------- Forwarded')[0].strip()
+    l2 = l2.split('----- Forwarded')[0].strip()
+    l2 = l2.split('---------From:')[0].strip()
+    l2 = l2.split('**********************************************************************This')[0].strip()
+    l2 = l2.split('**********************************************************************   This')[0].strip()
+    l2 = l2.split('******************************************************************This')[0].strip()
+    l2 = l2.split('*************************************************This')[0].strip()
+    l2 = l2.split('********************************************************************** This')[0].strip()
+    l2 = l2.split('--------- Inline attachment follows')[0].strip()
+    l2 = l2.split('The information contained in this e-mail message and')[0].strip()
+    l2 = l2.split('This message is for the designated recipient')[0].strip()
+    l2 = l2.split('***Please be advised')[0].strip()
+    l2 = l2.split('*******This message')[0].strip()
+    l2 = l2.split('This message (including any attachments) contains')[0].strip()
+    l2 = l2.split('*********************************************************')[0].strip()
+    l2 = l2.split('_________________________________________________________________Get')[0].strip()
+    l2 = l2.split('___________________________________________')[0].strip()
+    l2 = l2.split('__________________________________________________ Do')[0].strip()
+    l2 = l2.replace("\\\"", " \" ").replace("(", " (").replace(")", ") ").replace("[", " [").replace("]", "] ").replace("?", "? ").replace("!", "! ").replace("? ?", "??").replace("! !", "!!").replace(":", ": ").replace("\t", " ").replace("= ", "").replace("=20","").replace("=90","").replace("=018","").replace("=09","").replace("=3D","")
+    l2 = l2.replace(" s ", " 's ").replace(" ve ", " 've ").replace(" re ", " 're ").replace(" ll ", " 'll ").replace(" m ", " 'm ").replace(" t ", " 't ").replace(" d ", " 'd ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace("  ", " ").replace(". . .", "...")
+    l2 = l2.replace(". yahoo", ".yahoo").replace("www. ", "www.").replace(". htm", ".htm").replace(". co", ".co").replace(". org", ".org").replace(". edu", ".edu").replace(". net", ".net").replace(". NET", ".NET").replace(". CO", ".CO").replace(". ORG", ".ORG").replace(". EDU", ".EDU").replace(": //", "://")
+    l2 = l2.replace(": 0", ":0").replace(": 1", ":1").replace(": 2", ":2").replace(": 3", ":3").replace(": 4", ":4").replace(": 5", ":5").replace(": 6", ":6").replace(": 7", ":7").replace(": 8", ":8").replace(": 9", ":9")
+    l2 = l2.replace(". url -", ".url - <<").replace(". doc -", ".doc - <<").replace(". pdf -", ".pdf <<").replace(". xls -", ".xls <<").replace(". url", ".url>>").replace(". doc", ".doc>>").replace(". pdf", ".pdf>>").replace(". xls", ".xls>>").replace("<< ", "<<").replace("> >", " ").replace("  ", " ")
+    l2 = l2.replace(". URL -", ".URL - <<").replace(". DOC -", ".DOC - <<").replace(". PDF -", ".PDF <<").replace(". XLS -", ".xls <<").replace(". URL", ".URL>>").replace(". DOC", ".DOC>>").replace(". PDF", ".PDF>>").replace(". XLS", ".XLS>>").replace("<< ", "<<").replace("> >", " ").replace("  ", " ")
+    l2 = l2.replace("RE:", "").replace("Re:", "").replace("RE: ", "").replace("Re: ", "").replace("Fw: ", "").replace("FW: ", "").replace("FWD: ", "").replace("Fwd: ", "")
+    l2 = l2.replace('Importance: High',':')
+    if "Sent:" in l2: return
+    l2 = l2.replace("...", "... ").replace("\"\"", " \" ").replace("  ", " ").strip(" -:;[]()\=<>\"").rstrip(".!?")
+    l2Arr = l2.split()
+    if len(l2Arr) > 3:
+        l2 = " ".join(itertools.chain(*[camel_case_split(a) for a in l2Arr]))
+        if l2.replace(":", "").replace("[", "").replace("]", "").replace(".", "").replace("!", "").replace("?", "").replace(",", "").replace("-", "").replace(";", "").replace(" ", "").lower() in prev: return
+        l2 = l2.replace("==", "--")
+        l2 = l2.replace("++", "--")
+        l2 = l2.replace("*~", "--")
+        l2 = l2.replace("||", "--")
+        l2 = l2.replace("**", "--")
+        l2 = l2.replace("__", "--")
+        l2 = l2.replace("##", "--")
+        for l3 in l2.split('--'):
+            if l3 := l3.strip():
+                for l4 in l3.split("Subject: "):
+                    if l4 := l4.strip('=, '):
+                        o.write(l4+"\tenron\n")
+        prev[l2.replace(":", "").replace("[", "").replace("]", "").replace(".", "").replace("!", "").replace("?", "").replace(",", "").replace("-", "").replace(";", "").replace(" ", "").lower()] = 1
 
 def has_any(s, lst):
-  for l in lst:
-    if l in s: return True
-  return False
+    return any(l in s for l in lst)
 
 #from https://github.com/joke2k/faker/blob/master/faker/providers/person/en/__init__.py which is under the MIT License
 #not an exausthive list. just to do some filtering for civil_comment. 

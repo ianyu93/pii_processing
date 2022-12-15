@@ -25,11 +25,11 @@ from neuralcoref.train.conllparser import FEATURES_NAMES
 
 
 def load_embeddings_from_file(name):
-    print("loading", name + "_embeddings.npy")
-    embed = torch.from_numpy(np.load(name + "_embeddings.npy")).float()
+    print("loading", f"{name}_embeddings.npy")
+    embed = torch.from_numpy(np.load(f"{name}_embeddings.npy")).float()
     print(embed.size())
-    print("loading", name + "_vocabulary.txt")
-    with io.open(name + "_vocabulary.txt", "r", encoding="utf-8") as f:
+    print("loading", f"{name}_vocabulary.txt")
+    with io.open(f"{name}_vocabulary.txt", "r", encoding="utf-8") as f:
         voc = [line.strip() for line in f]
     return embed, voc
 
@@ -43,21 +43,16 @@ class _DictionaryDataLoader(object):
         return len(self.dict_object[self.order[0]])
 
     def __getitem__(self, idx):
+        data = []
         if isinstance(idx, slice):
-            data = []
             for i in range(
                 idx.start, idx.stop, idx.step if idx.step is not None else 1
             ):
-                temp_data = []
-                for key in self.order:
-                    temp_data.append(self.dict_object[key][i])
+                temp_data = [self.dict_object[key][i] for key in self.order]
                 data.append(temp_data)
 
         else:
-            data = []
-            for key in self.order:
-                data.append(self.dict_object[key][idx])
-
+            data.extend(self.dict_object[key][idx] for key in self.order)
         return data
 
 
@@ -73,7 +68,7 @@ class NCDataset(Dataset):
         numpy_files_found = False
         print("Reading ", end="")
         for file_name in os.listdir(data_path):
-            if not ".npy" in file_name:
+            if ".npy" not in file_name:
                 continue
             numpy_files_found = True
             print(file_name, end=", ")
@@ -416,8 +411,7 @@ class NCBatchSampler(Sampler):
     def __iter__(self):
         if self.shuffle:
             np.random.shuffle(self.batches)
-        for batch in self.batches:
-            yield batch
+        yield from self.batches
 
     def __len__(self):
         return self.n_batches
@@ -460,7 +454,7 @@ def padder_collate(batch, debug=False):
             for i, t_targ in enumerate(
                 transposed_targets
             ):  # 0:labels, 1:costs, 2:true_ants, 3:false_ants
-                if i == 2 or i == 3:
+                if i in [2, 3]:
                     if debug:
                         print("collate before", t_targ)
                     # shift the antecedent index associated to single anaphores (last)

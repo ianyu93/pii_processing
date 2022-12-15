@@ -65,9 +65,11 @@ class ConllEvaluator(object):
         self.tokens = datas[FEATURES_NAMES[10]]
         self.lookup = datas[FEATURES_NAMES[11]]
         self.docs = datas[FEATURES_NAMES[12]]
-        self.flat_m_idx = list(
-            (doc_i, m_i) for doc_i, l in enumerate(self.m_loc) for m_i in range(len(l))
-        )
+        self.flat_m_idx = [
+            (doc_i, m_i)
+            for doc_i, l in enumerate(self.m_loc)
+            for m_i in range(len(l))
+        ]
 
     ###########################
     #### CLUSTER FUNCTIONS ####
@@ -77,13 +79,13 @@ class ConllEvaluator(object):
         """
         Clean up and prepare one cluster for each mention
         """
-        self.mention_to_cluster = list(
+        self.mention_to_cluster = [
             list(range(len(doc_mentions))) for doc_mentions in self.m_loc
-        )
-        self.clusters = list(
-            dict((i, [i]) for i in doc_mentions)
+        ]
+        self.clusters = [
+            {i: [i] for i in doc_mentions}
             for doc_mentions in self.mention_to_cluster
-        )
+        ]
 
     def _merge_coreference_clusters(self, ant_flat_idx, mention_flat_idx):
         """
@@ -115,7 +117,7 @@ class ConllEvaluator(object):
                 else:
                     kept = True
                     if debug:
-                        l = list(self.m_loc[doc_idx][m][3] for m in mentions)
+                        l = [self.m_loc[doc_idx][m][3] for m in mentions]
                         print("Cluster found", key)
                         print(
                             "Corefs:",
@@ -146,7 +148,7 @@ class ConllEvaluator(object):
             )
             print(self.clusters[d_i])
             for key, mentions in self.clusters[d_i].items():
-                l = list(self.m_loc[d_i][m][3] for m in mentions)
+                l = [self.m_loc[d_i][m][3] for m in mentions]
                 print(
                     "cluster",
                     key,
@@ -202,9 +204,7 @@ class ConllEvaluator(object):
                         ind < n_pairs
                     ):  # the single score is not the highest, we have a match !
                         prev_idx = m_idx - n_pairs + ind
-                        if debug is not None and (
-                            debug == -1 or debug == prev_idx or debug == m_idx
-                        ):
+                        if debug is not None and debug in [-1, prev_idx, m_idx]:
                             m1_doc, m1_idx = self.flat_m_idx[m_idx]
                             m1 = self.docs[m1_doc]["mentions"][m1_idx]
                             m2_doc, m2_idx = self.flat_m_idx[prev_idx]
@@ -212,10 +212,10 @@ class ConllEvaluator(object):
                             print(
                                 "We have a match between:",
                                 m1,
-                                "(" + str(m1_idx) + ")",
+                                f"({str(m1_idx)})",
                                 "and:",
                                 m2,
-                                "(" + str(m2_idx) + ")",
+                                f"({str(m2_idx)})",
                             )
                         self._merge_coreference_clusters(prev_idx, m_idx)
             if remove_singleton:
@@ -242,14 +242,11 @@ class ConllEvaluator(object):
                         elif m_utt == utt_idx:
                             if m_start in lookup:
                                 out_coref += "|" if out_coref else ""
-                                out_coref += "(" + unicode_(mention_cluster)
-                                if (m_end - 1) in lookup:
-                                    out_coref += ")"
-                                else:
-                                    out_coref += ""
+                                out_coref += f"({unicode_(mention_cluster)}"
+                                out_coref += ")" if (m_end - 1) in lookup else ""
                             elif (m_end - 1) in lookup:
                                 out_coref += "|" if out_coref else ""
-                                out_coref += unicode_(mention_cluster) + ")"
+                                out_coref += f"{unicode_(mention_cluster)})"
                     out_line = (
                         doc["name"]
                         + " "
@@ -329,7 +326,7 @@ class ConllEvaluator(object):
                 ident_NP,
                 ident_DP,
             )
-        F1_conll = sum([score[metric][2] for metric in CONLL_METRICS]) / len(
+        F1_conll = sum(score[metric][2] for metric in CONLL_METRICS) / len(
             CONLL_METRICS
         )
         print(

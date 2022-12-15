@@ -816,18 +816,17 @@ def pre_translation_steps(infile, target_lang='hi'):
             row_id = int(dat['id'])
         context = {}
         ner_mapping = {}
-        seen = {}
-        text = "... " + text + " "
+        text = f"... {text} "
         text = text.replace(lbracket, "(")
         text = text.replace(rbracket, ")", )
         if person_swap:
             _idx = 0
+            seen = {}
             for item in ner2:
                 if item[0] in seen: continue
                 seen[item[0]] = 1
-                text = text.replace(item[0],
-                                        ' ' + str(_idx) + " " + lbracket + item[0] + rbracket)
-                ner_mapping[str(_idx) + " " + lbracket] = item
+                text = text.replace(item[0], f' {str(_idx)} {lbracket}{item[0]}{rbracket}')
+                ner_mapping[f"{str(_idx)} {lbracket}"] = item
                 _idx += 1
 
         texts.append(text)
@@ -892,9 +891,7 @@ def get_aligned_text(sent1, sent2, target_lang):
     return (blocks2, score)
 
 def post_translation_steps(outfile, translations, original_sentences, ner_mappings, row_ids, domains, target_lang='hi'):
-    rbracket = "]"
-    if target_lang in ('zh', 'ja', 'ko'):
-        rbracket = "]]"
+    rbracket = "]]" if target_lang in ('zh', 'ja', 'ko') else "]"
     with open(outfile, "w", encoding="utf8") as o:
         for original_text, trans_text in zip(original_sentences, translations):
             index += 1
@@ -940,95 +937,101 @@ def post_translation_steps(outfile, translations, original_sentences, ner_mappin
 #TODO - calculate fmeasure
 #TODO - check for zh working properly
 def apply_rules(infile, outfile, rule_base, target_lang, do_ontology_manager=True, do_spacy_if_avail=True, char_before_after_window=10):
-  nlp = None
-  if do_spacy_if_avail:
-    if target_lang == 'en':
-      nlp = spacy.load('en_core_web_lg')
-    elif target_lang == 'zh':
-      nlp = spacy.load('zh_core_web_lg')
-    elif target_lang == 'pt':
-      nlp = spacy.load('pt_core_news_lg')
-    elif target_lang == 'fr':
-      nlp = spacy.load('fr_core_news_lg')
-    elif target_lang == 'ca':
-      nlp = spacy.load('ca_core_news_lg')
-  if do_ontology_manager:
-    ontology_manager = OntologyManager(target_lang=target_lang)
-  else:
-    ontology_manager = None
-  right = {}
-  wrong = {}
-  with open(outfile, "w", encoding="utf8") as o:
-    for line in tqdm(open(infile, "rb")):
-        pred = [] #predicted regex rules ent:label
-        d = json.loads(line)
-        text = d['text']
-        if not text: continue
-        predict_ner = d.get('predict_ner',{})
-        if ontology_manager:
-          parsed = ontology_manager.tokenize(text)
-          cunk2ner = list(parsed['chunk2ner'].items())
-          for c in cunk2ner:
-            key, val = c[0][0].replace(" ", "").replace("_", "").replace("_", "") if target_lang in  ('zh', 'ja', 'ko') else c[0][0].replace("_", " ").replace("_", " "), c[1]
-            predict_ner[key] = val
-        if nlp:
-          doc = nlp(text)
-          entities = list(doc.ents)
-          ents = dict(list(set([(entity.text, entity.label_) for entity in entities if
-            entity.label_ in ('PERSON', 'GPE', 'ORG', 'NORP') and 'http:' not in entity.text])))
-          for ent, label in ents.items():
-            if ent in predict_ner and ('PERSON' if predict_ner[ent] == 'PUBLIC_FIGURE' else predict_ner[ent]) ==label:
-              #print ("matched")
-              continue
-            else:
-              #remove simple overlap
-              for key in list(predict_ner.keys()):
-                if " "+key in ent or key+" " in ent: # or " "+ent in key or ent+" " in key:
-                  if predict_ner[key] == 'PUBLIC_FIGURE':
-                    label = "PUBLIC_FIGURE"
-                  del predict_ner[key]
-              predict_ner[ent] = label
-        rule_level = -1
-        ner = d['ner'] # the human tagged data
-        for rule_groups, ntimes in rule_base:
-          rule_level += 1
-          for times in range(ntimes):
-            rule_id = -1
-            for label, regex, old_label, before, after in rule_groups:
-              rule_id += 1
-              if old_label is None and times > 0: continue  
-              for ent in regex.findall(text):
-                if type(ent) != str: continue
-                if old_label is not None and (ent not in predict_ner or predict_ner[ent] != old_label): continue
-                t = text
-                len_ent = len(ent)
-                while ent in t:
-                  i = t.index(ent)
-                  if before:
-                    before_t[max(0, i-char_before_after_window): i]
-                    if before not in before_t:
-                      t = t[i + len_ent:]
-                      continue
-                  if after:
-                    after_t[i+len_x: min(len_text, i+len_ent+char_before_after_window)]
-                    if after not in after_t:
-                      t = t[i + len_ent:]
-                      continue
-                  #remove simple overlap
-                  for key in list(predict_ner.keys()):
-                    if " "+key in ent or key+" " in ent:# or " "+ent in key or ent+" " in key:
-                      del predict_ner[key]
-                  pred.append((ent, label, rule_id, rule_level))
-                  predict_ner[ent] = label
-                  break
-        d['predict_ner'] = list(predict_ner.items())
-        o.write(json.dumps(d)+"\n")
-        for ent, label, rule_id, rule_level in list(set(pred)): 
-          if ent not in ner or ner[ent] != label:
-            wrong[(ent, label, rule_id, rule_level)] = wrong.get((ent, label, rule_id, rule_level), 0) + 1
-          else:
-            right[(ent, label, rule_id, rule_level)] = right.get((ent, label, rule_id, rule_level), 0) + 1
-  return right, wrong
+    nlp = None
+    if do_spacy_if_avail:
+      if target_lang == 'en':
+        nlp = spacy.load('en_core_web_lg')
+      elif target_lang == 'zh':
+        nlp = spacy.load('zh_core_web_lg')
+      elif target_lang == 'pt':
+        nlp = spacy.load('pt_core_news_lg')
+      elif target_lang == 'fr':
+        nlp = spacy.load('fr_core_news_lg')
+      elif target_lang == 'ca':
+        nlp = spacy.load('ca_core_news_lg')
+    if do_ontology_manager:
+      ontology_manager = OntologyManager(target_lang=target_lang)
+    else:
+      ontology_manager = None
+    right = {}
+    wrong = {}
+    with open(outfile, "w", encoding="utf8") as o:
+        for line in tqdm(open(infile, "rb")):
+            pred = [] #predicted regex rules ent:label
+            d = json.loads(line)
+            text = d['text']
+            if not text: continue
+            predict_ner = d.get('predict_ner',{})
+            if ontology_manager:
+              parsed = ontology_manager.tokenize(text)
+              cunk2ner = list(parsed['chunk2ner'].items())
+              for c in cunk2ner:
+                key, val = c[0][0].replace(" ", "").replace("_", "").replace("_", "") if target_lang in  ('zh', 'ja', 'ko') else c[0][0].replace("_", " ").replace("_", " "), c[1]
+                predict_ner[key] = val
+            if nlp:
+                doc = nlp(text)
+                entities = list(doc.ents)
+                ents = dict(
+                    list(
+                        {
+                            (entity.text, entity.label_)
+                            for entity in entities
+                            if entity.label_
+                            in ('PERSON', 'GPE', 'ORG', 'NORP')
+                            and 'http:' not in entity.text
+                        }
+                    )
+                )
+                for ent, label in ents.items():
+                    if ent in predict_ner and ('PERSON' if predict_ner[ent] == 'PUBLIC_FIGURE' else predict_ner[ent]) ==label:
+                        #print ("matched")
+                        continue
+                                  #remove simple overlap
+                    for key in list(predict_ner.keys()):
+                        if f" {key}" in ent or f"{key} " in ent: # or " "+ent in key or ent+" " in key:
+                            if predict_ner[key] == 'PUBLIC_FIGURE':
+                              label = "PUBLIC_FIGURE"
+                            del predict_ner[key]
+                    predict_ner[ent] = label
+            ner = d['ner'] # the human tagged data
+            for rule_level, (rule_groups, ntimes) in enumerate(rule_base):
+                for times in range(ntimes):
+                    rule_id = -1
+                    for label, regex, old_label, before, after in rule_groups:
+                        rule_id += 1
+                        if old_label is None and times > 0: continue
+                        for ent in regex.findall(text):
+                            if type(ent) != str: continue
+                            if old_label is not None and (ent not in predict_ner or predict_ner[ent] != old_label): continue
+                            t = text
+                            len_ent = len(ent)
+                            while ent in t:
+                                i = t.index(ent)
+                                if before:
+                                  before_t[max(0, i-char_before_after_window): i]
+                                  if before not in before_t:
+                                    t = t[i + len_ent:]
+                                    continue
+                                if after:
+                                  after_t[i+len_x: min(len_text, i+len_ent+char_before_after_window)]
+                                  if after not in after_t:
+                                    t = t[i + len_ent:]
+                                    continue
+                                                  #remove simple overlap
+                                for key in list(predict_ner.keys()):
+                                    if f" {key}" in ent or f"{key} " in ent:# or " "+ent in key or ent+" " in key:
+                                        del predict_ner[key]
+                                pred.append((ent, label, rule_id, rule_level))
+                                predict_ner[ent] = label
+                                break
+            d['predict_ner'] = list(predict_ner.items())
+            o.write(json.dumps(d)+"\n")
+            for ent, label, rule_id, rule_level in list(set(pred)): 
+              if ent not in ner or ner[ent] != label:
+                wrong[(ent, label, rule_id, rule_level)] = wrong.get((ent, label, rule_id, rule_level), 0) + 1
+              else:
+                right[(ent, label, rule_id, rule_level)] = right.get((ent, label, rule_id, rule_level), 0) + 1
+    return right, wrong
 
 
 if __name__ == "__main__":
@@ -1047,15 +1050,15 @@ if __name__ == "__main__":
 
     initial = target_lang = None
     if "-initial" in sys.argv:
-      initial = sys.argv[sys.argv.index("-initial")+1]   
+      initial = sys.argv[sys.argv.index("-initial")+1]
     if "-target_lang" in sys.argv:
-      target_lang = sys.argv[sys.argv.index("-target_lang")+1]   
+      target_lang = sys.argv[sys.argv.index("-target_lang")+1]
     if target_lang:
-      #TODO - load the rulebase dynamically from pii_processing.regex folder a file of the form <initial>_<target_lang>.py
-      infile = f"{target_lang}.jsonl"
-      outfile = "predicted_"+infile
-      right, wrong  = apply_rules(infile, outfile, rulebase, target_lang, char_before_after_window=10)
-      print ('right', right)
-      print ('wrong', wrong)
+        #TODO - load the rulebase dynamically from pii_processing.regex folder a file of the form <initial>_<target_lang>.py
+        infile = f"{target_lang}.jsonl"
+        outfile = f"predicted_{infile}"
+        right, wrong  = apply_rules(infile, outfile, rulebase, target_lang, char_before_after_window=10)
+        print ('right', right)
+        print ('wrong', wrong)
       #json.dump(right, open(f"right_regex_{target_lang}.json", "w", encoding="utf8"), indent=1)
       #json.dump(wrong, open(f"wrong_regex_{target_lang}.json", "w", encoding="utf8"), indent=1)

@@ -100,13 +100,13 @@ def get_ranking_loss(n):
 
 
 def decrease_lr(optim_func, factor=0.1, min_lrs=0, eps=0, verbose=True):
-    for i, param_group in enumerate(optim_func.param_groups):
+    for param_group in optim_func.param_groups:
         old_lr = float(param_group["lr"])
         new_lr = max(old_lr * factor, min_lrs)
         if old_lr - new_lr > eps:
             param_group["lr"] = new_lr
             if verbose:
-                print(f"Reducing learning rate" " of group {i} to {new_lr:.4e}.")
+                print('Reducing learning rate of group {i} to {new_lr:.4e}.')
     return new_lr
 
 
@@ -132,7 +132,7 @@ def run_model(args):
 
     # Load datasets and embeddings
     embed_path = args.weights if args.weights is not None else args.train
-    tensor_embeddings, voc = load_embeddings_from_file(embed_path + "tuned_word")
+    tensor_embeddings, voc = load_embeddings_from_file(f"{embed_path}tuned_word")
     dataset = NCDataset(args.train, args)
     eval_dataset = NCDataset(args.eval, args)
     print("Vocabulary:", len(voc))
@@ -209,9 +209,9 @@ def run_model(args):
     )
 
     def run_epochs(
-        start_epoch, end_epoch, loss_func, optim_func, save_name, lr, g_step, debug=None
-    ):
-        best_model_path = args.save_path + "best_model" + save_name
+            start_epoch, end_epoch, loss_func, optim_func, save_name, lr, g_step, debug=None
+        ):
+        best_model_path = f"{args.save_path}best_model{save_name}"
         start_time_all = time.time()
         best_f1_conll = 0
         lower_eval = 0
@@ -226,7 +226,7 @@ def run_model(args):
                 zip(mentions_idx, n_pairs, dataloader)
             ):
                 if debug is not None and (debug == -1 or debug in m_idx):
-                    l = list(dataset.flat_m_loc[m][2:] for m in m_idx)
+                    l = [dataset.flat_m_loc[m][2:] for m in m_idx]
                     print(
                         "🏔 Batch",
                         batch_i,
@@ -266,7 +266,7 @@ def run_model(args):
                 loss.backward()
                 epoch_loss += loss.item()
                 optim_func.step()
-                writer.add_scalar("train/" + save_name + "_loss", loss.item(), g_step)
+                writer.add_scalar(f"train/{save_name}_loss", loss.item(), g_step)
                 writer.add_scalar("meta/" + "lr", lr, g_step)
                 writer.add_scalar("meta/" + "stage", STAGES.index(save_name), g_step)
                 g_step += 1
@@ -321,10 +321,10 @@ def run_model(args):
                     print("Evaluation metric decreases")
                     lower_eval += 1
                     if lower_eval >= args.patience:
-                        if (
-                            args.on_eval_decrease == "divide_lr"
-                            or args.on_eval_decrease == "divide_then_next"
-                        ):
+                        if args.on_eval_decrease in [
+                            "divide_lr",
+                            "divide_then_next",
+                        ]:
                             print("reload best model and decrease lr")
                             load_model(model, best_model_path)
                             lr = decrease_lr(optim_func)
@@ -405,11 +405,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train",
         type=str,
-        default=DIR_PATH + "/data/",
+        default=f"{DIR_PATH}/data/",
         help="Path to the train dataset",
     )
     parser.add_argument(
-        "--eval", type=str, default=DIR_PATH + "/data/", help="Path to the eval dataset"
+        "--eval",
+        type=str,
+        default=f"{DIR_PATH}/data/",
+        help="Path to the eval dataset",
     )
     parser.add_argument(
         "--evalkey", type=str, help="Path to an optional key file for scoring"
@@ -548,7 +551,7 @@ if __name__ == "__main__":
     args.save_path = os.path.join(
         PACKAGE_DIRECTORY,
         "checkpoints",
-        current_time + "_" + socket.gethostname() + "_",
+        f"{current_time}_{socket.gethostname()}_",
     )
 
     np.random.seed(args.seed)
@@ -557,9 +560,11 @@ if __name__ == "__main__":
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
 
-    args.evalkey = args.evalkey if args.evalkey is not None else args.eval + "/key.txt"
-    args.trainkey = args.train + "/key.txt"
-    args.train = args.train + "/numpy/"
-    args.eval = args.eval + "/numpy/"
+    args.evalkey = (
+        args.evalkey if args.evalkey is not None else f"{args.eval}/key.txt"
+    )
+    args.trainkey = f"{args.train}/key.txt"
+    args.train = f"{args.train}/numpy/"
+    args.eval = f"{args.eval}/numpy/"
     print(args)
     run_model(args)

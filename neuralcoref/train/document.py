@@ -69,10 +69,10 @@ def extract_mentions_spans(doc, blacklist, debug=False):
                 c.dep_,
             )
     # Named entities
-    mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS)
+    mentions_spans = [ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS]
 
     if debug:
-        print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
+        print("==-- ents:", [(ent, ent.label_) for ent in mentions_spans])
     for spans in parallel_process(
         [{"doc": doc, "span": sent, "blacklist": blacklist} for sent in doc.sents],
         _extract_from_sent,
@@ -155,7 +155,7 @@ def _extract_from_sent(doc, span, blacklist=True, debug=False):
             continue
         if (
             not keep_tags.match(token.tag_) or token.dep_ in leave_dep
-        ) and not token.dep_ in keep_dep:
+        ) and token.dep_ not in keep_dep:
             if debug:
                 print("not pronoun or no right dependency")
             continue
@@ -227,16 +227,16 @@ def _extract_from_sent(doc, span, blacklist=True, debug=False):
         for c in doc:
             if debug and c.head.i == token.i:
                 print("🚧 token in span:", c, "- head & dep:", c.head, c.dep_)
-        left = list(c.left_edge.i for c in doc if c.head.i == token.i)
-        right = list(c.right_edge.i for c in doc if c.head.i == token.i)
+        left = [c.left_edge.i for c in doc if c.head.i == token.i]
+        right = [c.right_edge.i for c in doc if c.head.i == token.i]
         if (
             token.tag_ == "IN"
             and token.dep_ == "mark"
-            and len(left) == 0
-            and len(right) == 0
+            and not left
+            and not right
         ):
-            left = list(c.left_edge.i for c in doc if c.head.i == token.head.i)
-            right = list(c.right_edge.i for c in doc if c.head.i == token.head.i)
+            left = [c.left_edge.i for c in doc if c.head.i == token.head.i]
+            right = [c.right_edge.i for c in doc if c.head.i == token.head.i]
         if debug:
             print("left side:", left)
             print("right side:", right)
@@ -264,16 +264,16 @@ def _extract_from_sent(doc, span, blacklist=True, debug=False):
                         print("left no conj:", c, "dep & edge:", c.dep_, c.left_edge)
                     if debug:
                         print("right no conj:", c, "dep & edge:", c.dep_, c.right_edge)
-            left_no_conj = list(
+            left_no_conj = [
                 c.left_edge.i
                 for c in doc
                 if c.head.i == token.i and c.dep_ not in conj_or_prep
-            )
-            right_no_conj = list(
+            ]
+            right_no_conj = [
                 c.right_edge.i
                 for c in doc
                 if c.head.i == token.i and c.dep_ not in conj_or_prep
-            )
+            ]
             if debug:
                 print("left side no conj:", [doc[i] for i in left_no_conj])
             if debug:
@@ -310,11 +310,9 @@ class Mention(spacy.tokens.Span):
         *args,
         **kwargs,
     ):
-        # We need to override __new__ see http://cython.readthedocs.io/en/latest/src/userguide/special_methods.html
-        obj = spacy.tokens.Span.__new__(
+        return spacy.tokens.Span.__new__(
             cls, span.doc, span.start, span.end, *args, **kwargs
         )
-        return obj
 
     def __init__(
         self,
@@ -355,10 +353,14 @@ class Mention(spacy.tokens.Span):
 
     def _get_entity_label(self):
         """ Label of a detected named entity the Mention is nested in if any"""
-        for ent in self.doc.ents:
-            if ent.start <= self.start and self.end <= ent.end:
-                return ent.label
-        return None
+        return next(
+            (
+                ent.label
+                for ent in self.doc.ents
+                if ent.start <= self.start and self.end <= ent.end
+            ),
+            None,
+        )
 
     def _get_in_entities(self):
         """ Is the Mention nested in a detected named entity"""
@@ -370,21 +372,17 @@ class Mention(spacy.tokens.Span):
         prp = ["PRP", "PRP$"]
         proper = ["NNP", "NNPS"]
         if any(t.tag_ in conj and t.ent_type_ not in ACCEPTED_ENTS for t in self):
-            mention_type = MENTION_TYPE["LIST"]
+            return MENTION_TYPE["LIST"]
         elif self.root.tag_ in prp:
-            mention_type = MENTION_TYPE["PRONOMINAL"]
+            return MENTION_TYPE["PRONOMINAL"]
         elif self.root.ent_type_ in ACCEPTED_ENTS or self.root.tag_ in proper:
-            mention_type = MENTION_TYPE["PROPER"]
+            return MENTION_TYPE["PROPER"]
         else:
-            mention_type = MENTION_TYPE["NOMINAL"]
-        return mention_type
+            return MENTION_TYPE["NOMINAL"]
 
     def _get_doc_sent_number(self):
         """ Index of the sentence of the Mention in the current utterance"""
-        for i, s in enumerate(self.doc.sents):
-            if s == self.sent:
-                return i
-        return None
+        return next((i for i, s in enumerate(self.doc.sents) if s == self.sent), None)
 
     @property
     def content_words(self):
@@ -498,12 +496,18 @@ class EmbeddingExtractor:
     """
 
     def __init__(self, pretrained_model_path):
-        _, self.static_embeddings, self.stat_idx, self.stat_voc = self.load_embeddings_from_file(
-            pretrained_model_path + "static_word"
-        )
-        _, self.tuned_embeddings, self.tun_idx, self.tun_voc = self.load_embeddings_from_file(
-            pretrained_model_path + "tuned_word"
-        )
+        (
+            _,
+            self.static_embeddings,
+            self.stat_idx,
+            self.stat_voc,
+        ) = self.load_embeddings_from_file(f"{pretrained_model_path}static_word")
+        (
+            _,
+            self.tuned_embeddings,
+            self.tun_idx,
+            self.tun_voc,
+        ) = self.load_embeddings_from_file(f"{pretrained_model_path}tuned_word")
         self.fallback = self.static_embeddings.get(UNKNOWN_WORD)
 
         self.shape = self.static_embeddings[UNKNOWN_WORD].shape
@@ -516,9 +520,9 @@ class EmbeddingExtractor:
         embeddings = {}
         voc_to_idx = {}
         idx_to_voc = []
-        mat = np.load(name + "_embeddings.npy")
+        mat = np.load(f"{name}_embeddings.npy")
         average_mean = np.average(mat, axis=0, weights=np.sum(mat, axis=1))
-        with io.open(name + "_vocabulary.txt", "r", encoding="utf-8") as f:
+        with io.open(f"{name}_vocabulary.txt", "r", encoding="utf-8") as f:
             for i, line in enumerate(f):
                 embeddings[line.strip()] = mat[i, :]
                 voc_to_idx[line.strip()] = i
@@ -527,9 +531,7 @@ class EmbeddingExtractor:
 
     @staticmethod
     def normalize_word(w):
-        if w is None:
-            return MISSING_WORD
-        return re.sub(r"\d", "0", w.lower_)
+        return MISSING_WORD if w is None else re.sub(r"\d", "0", w.lower_)
 
     def get_document_embedding(self, utterances_list):
         """ Embedding for the document """
@@ -550,13 +552,10 @@ class EmbeddingExtractor:
     def get_word_embedding(self, word, static=False):
         """ Embedding for a single word (tuned if possible, otherwise static) """
         norm_word = self.normalize_word(word)
-        if static:
-            return self.get_stat_word(norm_word)
+        if not static and norm_word in self.tuned_embeddings:
+            return norm_word, self.tuned_embeddings.get(norm_word)
         else:
-            if norm_word in self.tuned_embeddings:
-                return norm_word, self.tuned_embeddings.get(norm_word)
-            else:
-                return self.get_stat_word(norm_word)
+            return self.get_stat_word(norm_word)
 
     def get_word_in_sentence(self, word_idx, sentence):
         """ Embedding for a word in a sentence """
@@ -588,7 +587,7 @@ class EmbeddingExtractor:
             self.get_average_embedding(mention_lefts),
             self.get_average_embedding(mention_rights),
             self.get_average_embedding(st),
-            (unicode_(doc_embedding[0:8]) + "...", doc_embedding),
+            (f"{unicode_(doc_embedding[:8])}...", doc_embedding),
         ]
         words = [
             self.get_word_embedding(mention.root),
@@ -690,11 +689,11 @@ class Document(object):
 
     def __str__(self):
         formatted = "\n ".join(
-            unicode_(i) + " " + unicode_(s)
+            f"{unicode_(i)} {unicode_(s)}"
             for i, s in zip(self.utterances, self.utterances_speaker)
         )
         mentions = "\n ".join(
-            unicode_(i) + " " + unicode_(i.speaker) for i in self.mentions
+            f"{unicode_(i)} {unicode_(i.speaker)}" for i in self.mentions
         )
         return f"<utterances, speakers> \n {formatted}\n<mentions> \n {mentions}"
 
@@ -708,8 +707,7 @@ class Document(object):
 
     def __iter__(self):
         """ Iterate over mentions (not utterances) """
-        for mention in self.mentions:
-            yield mention
+        yield from self.mentions
 
     #######################################
     ###### UTERANCE LOADING FUNCTIONS #####
@@ -753,9 +751,9 @@ class Document(object):
         utterances_index = []
         utt_start = len(self.utterances)
         docs = list(self.nlp.pipe(utterances))
-        m_spans = list(
+        m_spans = [
             extract_mentions_spans(doc, blacklist=self.blacklist) for doc in docs
-        )
+        ]
         for utt_index, (doc, m_spans, speaker_id) in enumerate(
             zip_longest(docs, m_spans, utterances_speaker)
         ):
@@ -784,7 +782,7 @@ class Document(object):
         Process mentions in a spacy doc (an utterance)
         """
         processed_spans = sorted(
-            (m for m in mentions_spans), key=lambda m: (m.root.i, m.start)
+            iter(mentions_spans), key=lambda m: (m.root.i, m.start)
         )
         n_mentions = len(self.mentions)
         for mention_index, span in enumerate(processed_spans):
@@ -909,9 +907,7 @@ class Document(object):
                 if mention.utterance_index in self.last_utterances_loaded:
                     yield i
         else:
-            iterator = range(len(self.mentions))
-            for i in iterator:
-                yield i
+            yield from range(len(self.mentions))
 
     def get_candidate_pairs(
         self, mentions=None, max_distance=50, max_distance_with_match=500, debug=False
@@ -934,7 +930,7 @@ class Document(object):
             word_to_mentions = {}
             for i in mentions:
                 for tok in self.mentions[i].content_words:
-                    if not tok in word_to_mentions:
+                    if tok not in word_to_mentions:
                         word_to_mentions[tok] = [i]
                     else:
                         word_to_mentions[tok].append(i)

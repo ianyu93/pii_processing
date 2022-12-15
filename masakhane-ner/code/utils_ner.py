@@ -58,7 +58,13 @@ def read_examples_from_file_flexible(file_path, mode):
         for line in f:
             if line.startswith("-DOCSTART-") or line == "" or line == "\n":
                 if words:
-                    examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
+                    examples.append(
+                        InputExample(
+                            guid=f"{mode}-{guid_index}",
+                            words=words,
+                            labels=labels,
+                        )
+                    )
                     guid_index += 1
                     words = []
                     labels = []
@@ -71,12 +77,16 @@ def read_examples_from_file_flexible(file_path, mode):
                     # Examples could have no label for mode = "test"
                     labels.append("O")
         if words:
-            examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
+            examples.append(
+                InputExample(
+                    guid=f"{mode}-{guid_index}", words=words, labels=labels
+                )
+            )
     return examples
 
 
 def read_examples_from_file(data_dir, mode):
-    file_path = os.path.join(data_dir, "{}.txt".format(mode))
+    file_path = os.path.join(data_dir, f"{mode}.txt")
     guid_index = 1
     examples = []
     with open(file_path, encoding="utf-8") as f:
@@ -87,7 +97,13 @@ def read_examples_from_file(data_dir, mode):
             if len(line) < 2  or line == "\n":
                 print(line, words)
                 if words:
-                    examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
+                    examples.append(
+                        InputExample(
+                            guid=f"{mode}-{guid_index}",
+                            words=words,
+                            labels=labels,
+                        )
+                    )
                     guid_index += 1
                     words = []
                     labels = []
@@ -100,7 +116,11 @@ def read_examples_from_file(data_dir, mode):
                     # Examples could have no label for mode = "test"
                     labels.append("O")
         if words:
-            examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
+            examples.append(
+                InputExample(
+                    guid=f"{mode}-{guid_index}", words=words, labels=labels
+                )
+            )
     return examples
 
 
@@ -229,11 +249,10 @@ def convert_examples_to_features(
 
 
 def get_labels(path):
-    if path:
-        with open(path, "r") as f:
-            labels = f.read().splitlines()
-        if "O" not in labels:
-            labels = ["O"] + labels
-        return labels
-    else:
+    if not path:
         return ["O", "B-DATE", "I-DATE", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]
+    with open(path, "r") as f:
+        labels = f.read().splitlines()
+    if "O" not in labels:
+        labels = ["O"] + labels
+    return labels

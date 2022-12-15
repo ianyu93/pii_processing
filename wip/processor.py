@@ -82,32 +82,29 @@ class Processor (OntologyManager):
   }
   
   def __init__(self,  target_lang="en", data_dir=None,  tmp_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
-                 upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
-                 connector = "_", en_spacy_models=[], label2label=None):
+                   upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
+                   connector = "_", en_spacy_models=[], label2label=None):
     super().__init__(target_lang=target_lang,  data_dir=data_dir,  tmp_dir=tmp_dir, max_word_len=max_word_len, compound_word_step = compound_word_step,  strip_chars=strip_chars,  \
-                 upper_ontology=upper_ontology,  x_lingual_lexicon_by_prefix_file=x_lingual_lexicon_by_prefix_file, target_lang_config_file=target_lang_config_file, x_lingual2ner_file=x_lingual2ner_file, \
-                 connector = connector, label2label=label2label)
+                   upper_ontology=upper_ontology,  x_lingual_lexicon_by_prefix_file=x_lingual_lexicon_by_prefix_file, target_lang_config_file=target_lang_config_file, x_lingual2ner_file=x_lingual2ner_file, \
+                   connector = connector, label2label=label2label)
 
-    if True:
       #hf stuff. we assume we are working only in CPU mode.
-      if target_lang in self.lang2ner_model:
-        model_name, cls = self.lang2ner_model[target_lang]
-        if model_name in self.model_loaded:
-          model = self.model_loaded[model_name]
-        else:
-          model = cls.from_pretrained(model_name)
-          model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
-          self.model_loaded[model_name] = model
-        self.ner_model_pipeline = pipeline("ner", model=model, tokenizer=AutoTokenizer.from_pretrained(model_name))
+    if target_lang in self.lang2ner_model:
+      model_name, cls = self.lang2ner_model[target_lang]
+      if model_name in self.model_loaded:
+        model = self.model_loaded[model_name]
       else:
-        model_name, cls = self.default_ner_model
-        if model_name in self.model_loaded:
-          model = self.model_loaded[model_name]
-        else:
-          model = cls.from_pretrained(model_name)
-          model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
-        self.ner_model_pipeline = pipeline("ner", model=model, tokenizer=AutoTokenizer.from_pretrained(model_name))
-
+        model = cls.from_pretrained(model_name)
+        model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+        self.model_loaded[model_name] = model
+    else:
+      model_name, cls = self.default_ner_model
+      if model_name in self.model_loaded:
+        model = self.model_loaded[model_name]
+      else:
+        model = cls.from_pretrained(model_name)
+        model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+    self.ner_model_pipeline = pipeline("ner", model=model, tokenizer=AutoTokenizer.from_pretrained(model_name))
     #spacy stuff
     if en_spacy_models: 
       self.en_spacy_models = en_spacy_models
@@ -197,7 +194,7 @@ class Processor (OntologyManager):
 
     #store away coref NOUNs for potential label and coref reference
     #same rule as above for promoting a noun span into one considered for further processing.
-    for cl in list(doc._.coref_clusters) :
+    for cl in list(doc._.coref_clusters):
       mentions = [(entity.text, entity.start, entity.end, row_id, doc_id) for entity in cl.mentions]
       mentions.sort(key=lambda e: len(e[0]), reverse=True)
       textArr = mentions[0][0].lower().split()
@@ -207,10 +204,7 @@ class Processor (OntologyManager):
         mention_lower = mention[0].lower()
         textArr = mention_lower.split()
         if mention_lower not in self.stopwords:
-          if len(textArr) > 1:
-            short_span = " ".join(textArr[-2:])
-          else:
-            short_span = textArr[0]
+          short_span = " ".join(textArr[-2:]) if len(textArr) > 1 else textArr[0]
           ref2chunk[short_span] = ref2chunk.get(short_span, []) + mentions
           non_stopwords = [a for a in textArr if a not in self.stopwords]
           if len(non_stopwords) > 2:
@@ -245,27 +239,26 @@ class Processor (OntologyManager):
       for b in b1:
         chunk2ref[b] = a
 
-    # expand coref information by using the most common coref label in a cluster
-    if True:
-      for cl in list(doc._.coref_clusters) :
-        mentions = [(entity.text, entity.start, entity.end, row_id, doc_id) for entity in cl.mentions]
-        all_mentions = list(set(itertools.chain(*[ref2chunk[chunk2ref[mention]] for mention in mentions if mention in chunk2ref])))
-        corefs = [chunk2ref[mention] for mention in mentions if mention in chunk2ref]
-        if corefs:
-          coref = Counter(corefs).most_common()[0][0]
-        else:
-          coref = cl.main.text.lower()
-        for mention in all_mentions:
-          if mention not in chunk2ner:
-            chunk2ner[mention] = 'NOUN'
-          old_ref = chunk2ref.get(mention)
-          if old_ref and mention in ref2chunk[old_ref]:
-            ref2chunk[old_ref].remove(mention)
-            if not ref2chunk[old_ref]:
-              del ref2chunk[old_ref]
-          chunk2ref[mention] = coref
-          if mention not in ref2chunk[coref]:
-            ref2chunk[coref].append(mention)
+    for cl in list(doc._.coref_clusters):
+      mentions = [(entity.text, entity.start, entity.end, row_id, doc_id) for entity in cl.mentions]
+      all_mentions = list(set(itertools.chain(*[ref2chunk[chunk2ref[mention]] for mention in mentions if mention in chunk2ref])))
+      if corefs := [
+          chunk2ref[mention] for mention in mentions if mention in chunk2ref
+      ]:
+        coref = Counter(corefs).most_common()[0][0]
+      else:
+        coref = cl.main.text.lower()
+      for mention in all_mentions:
+        if mention not in chunk2ner:
+          chunk2ner[mention] = 'NOUN'
+        old_ref = chunk2ref.get(mention)
+        if old_ref and mention in ref2chunk[old_ref]:
+          ref2chunk[old_ref].remove(mention)
+          if not ref2chunk[old_ref]:
+            del ref2chunk[old_ref]
+        chunk2ref[mention] = coref
+        if mention not in ref2chunk[coref]:
+          ref2chunk[coref].append(mention)
 
     #expand ner labels based on coref matches 
     for entity in list(doc.ents) :
@@ -276,20 +269,13 @@ class Processor (OntologyManager):
         for mention in ref2chunk[coref]:
           chunk2ner[mention] = entity.label_  
 
-    # overwrite all ner labels in the coref cluster to PERSON if there is a person pronoun
-    if True:
-      for cl in list(doc._.coref_clusters):
-        cluster_text_list = set([m.text.lower() for m in cl.mentions if m.text != 'US'])
-        found=False
-        # since we are doing English, we can do basic person pronoun matching
-        for pr in self.en_basic_person_pronouns:
-          if pr in cluster_text_list:
-            found = True
-            break
-        if found:
-          label = "PERSON"
-          for m in cl.mentions:
-            chunk2ner[(m.text, m.start, m.end, row_id, doc_id)] = label
+    for cl in list(doc._.coref_clusters):
+      cluster_text_list = {m.text.lower() for m in cl.mentions if m.text != 'US'}
+      found = any(pr in cluster_text_list for pr in self.en_basic_person_pronouns)
+      if found:
+        label = "PERSON"
+        for m in cl.mentions:
+          chunk2ner[(m.text, m.start, m.end, row_id, doc_id)] = label
     return self._cleanup_chunks(text,  chunk2ner, chunk2ref, ref2chunk, row_id, doc_id, doc, mention_access_fn=lambda a: a.text)
 
   def _hf_ner(self, text, chunk2ner, chunk2ref, ref2chunk, row_id=0, doc_id=0):
@@ -309,16 +295,16 @@ class Processor (OntologyManager):
     prev_label = None
     prev_start = None
     for ner_result in results:
-      if ner_result['entity'].startswith('I-'):
-        if prev_label and ner_result['entity'].split("-")[-1].upper() != prev_label:
-          start = ner_result['start']
-          if not is_cjk and text[start] != ' ':
-            for j in range(1, start):
-              if start - j == -1 or text[start-j] == ' ':
-                start = max(start -j, 0)
-                break
-          if text[start] == ' ': start += 1
-          prev_word.append(text[start:].strip().split(" ",1)[0])
+      if (ner_result['entity'].startswith('I-') and prev_label
+          and ner_result['entity'].split("-")[-1].upper() != prev_label):
+        start = ner_result['start']
+        if not is_cjk and text[start] != ' ':
+          for j in range(1, start):
+            if start - j == -1 or text[start-j] == ' ':
+              start = max(start -j, 0)
+              break
+        if text[start] == ' ': start += 1
+        prev_word.append(text[start:].strip().split(" ",1)[0])
       if ner_result['entity'].startswith('B-'):
         start = ner_result['start']
         if not is_cjk and text[start] != ' ':

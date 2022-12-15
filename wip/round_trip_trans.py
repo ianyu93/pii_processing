@@ -70,12 +70,12 @@ class RoundTripTranslate:
     if to == self.target_lang:
       fr = 'en'
     if fr == 'en':
-      if to == None:
+      if to is None:
         to = self.target_lang
       if to != self.target_lang:
         raise RuntimeError("one of 'from' or 'to' must be in the target lang")
     if to == 'en':
-      if fr == None:
+      if fr is None:
         fr = self.target_lang
       if fr != self.target_lang:
         raise RuntimeError("one of 'from' or 'to' must be in the target lang")

@@ -192,9 +192,9 @@ class OntologyManager:
   def load_target_lang_config(self,  target_lang_config_file=None, target_lang=None):
     data_dir = self.data_dir
     tmp_dir = self.tmp_dir
-    if target_lang_config_file is None:
-      if os.path.exists(os.path.join(data_dir, f'{target_lang}.json')): 
-        target_lang_config_file=  os.path.join(data_dir, f'{target_lang}.json')
+    if target_lang_config_file is None and os.path.exists(
+        os.path.join(data_dir, f'{target_lang}.json')):
+      target_lang_config_file=  os.path.join(data_dir, f'{target_lang}.json')
     if target_lang_config_file is None: return
     if os.path.exists(target_lang_config_file):
       self.target_lang_config = json.load(open(target_lang_config_file, "rb"))
@@ -222,15 +222,15 @@ class OntologyManager:
     self.binary_gender_swap = self.target_lang_config.get('binary_gender_swap', {})
     self.other_gender_swap = self.target_lang_config.get('other_gender_swap', {})
     self.en_pronoun2gender = self.target_lang_config.get('en_pronoun2gender', {})
-    self.en_pronoun2pronoun = self.target_lang_config.get('en_pronoun2pronoun', {}) 
+    self.en_pronoun2pronoun = self.target_lang_config.get('en_pronoun2pronoun', {})
     self.en_pronoun2title = self.target_lang_config.get('en_pronoun2title', {})
-    self.person2religion = self.target_lang_config.get('person2religion', {})  
+    self.person2religion = self.target_lang_config.get('person2religion', {})
     self.gender2en_pronoun = dict(itertools.chain(*[[(b,a) for b in lst] for a, lst in self.en_pronoun2gender.items()]))
     self.pronoun2en_pronoun = dict(itertools.chain(*[[(b,a) for b in lst] for a, lst in self.en_pronoun2pronoun.items()]))
     self.title2en_pronoun = dict(itertools.chain(*[[(b,a) for b in lst] for a, lst in self.en_pronoun2title.items()]))
     self.religion2person = dict(itertools.chain(*[[(b,a) for b in lst] for a, lst in self.person2religion.items()]))
     self.coref_window = self.target_lang_config.get('coref_window', [-1, -2, 1, 2])  #maybe this should be a parameter and not in the ontology
- 
+
     #now specialize the ontology for target_lang and have no limit on the size of the words
     target_lang_ontology = {}
     for label, words in self.target_lang_config if type(self.target_lang_config) is list else self.target_lang_config.items():
@@ -248,10 +248,8 @@ class OntologyManager:
     #os.system(f"gzip {data_dir}/{target_lang_config_file}")
     
   def _has_nonstopword(self, wordArr):
-    for word in wordArr:
-      if word.strip(self.strip_chars) not in self.stopwords:
-        return True
-    return False
+    return any(
+        word.strip(self.strip_chars) not in self.stopwords for word in wordArr)
 
   def _get_all_word_shingles(self, wordArr, max_word_len=None, create_suffix_end=True):
     """  create patterned variations (prefix and suffix based shingles) """
@@ -262,28 +260,34 @@ class OntologyManager:
     wordArr1 = wordArr2 = wordArr3 = wordArr4 = None
     ret = []
     if lenWordArr > compound_word_step:
-        # we add some randomness in how we create patterns
-        wordArr1 = wordArr[:compound_word_step-1] + [wordArr[-1]]
-        wordArr2 = [wordArr[0]] + wordArr[1-compound_word_step:] 
-        wordArr1 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr1]
-        wordArr2 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr2]
-        ret.extend([tuple(wordArr1),tuple(wordArr2)])
-        if create_suffix_end:
-          wordArr3 = copy.copy(wordArr1)
-          wordArr3[-1] = wordArr3[-1] if len(wordArr3[-1]) <=max_word_len else '*'+wordArr3[-1][len(wordArr3[-1])-max_word_len+1:]
-          wordArr4 = copy.copy(wordArr2)
-          wordArr4[-1] = wordArr4[-1] if len(wordArr4[-1]) <=max_word_len else '*'+wordArr4[-1][len(wordArr4[-1])-max_word_len+1:]
-          wordArr3 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr3]
-          wordArr4 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr4]
-          ret.extend([tuple(wordArr3),tuple(wordArr4)])
+      # we add some randomness in how we create patterns
+      wordArr1 = wordArr[:compound_word_step-1] + [wordArr[-1]]
+      wordArr2 = [wordArr[0]] + wordArr[1-compound_word_step:]
+      wordArr1 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr1]
+      wordArr2 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr2]
+      ret.extend([tuple(wordArr1),tuple(wordArr2)])
+      if create_suffix_end:
+        wordArr3 = copy.copy(wordArr1)
+        wordArr3[-1] = (
+            wordArr3[-1] if len(wordArr3[-1]) <= max_word_len else
+            f'*{wordArr3[-1][len(wordArr3[-1]) - max_word_len + 1:]}')
+        wordArr4 = copy.copy(wordArr2)
+        wordArr4[-1] = (
+            wordArr4[-1] if len(wordArr4[-1]) <= max_word_len else
+            f'*{wordArr4[-1][len(wordArr4[-1]) - max_word_len + 1:]}')
+        wordArr3 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr3]
+        wordArr4 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr4]
+        ret.extend([tuple(wordArr3),tuple(wordArr4)])
     else: # lenWordArr <= compound_word_step
-        wordArr1 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr]
-        ret.append(tuple(wordArr1))
-        if lenWordArr > 1 and create_suffix_end:
-          wordArr2 = copy.copy(wordArr)
-          wordArr2[-1] = wordArr2[-1] if len(wordArr2[-1]) <=max_word_len else '*'+wordArr2[-1][len(wordArr2[-1])-max_word_len+1:]
-          wordArr2 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr2]
-          ret.append(tuple(wordArr2))
+      wordArr1 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr]
+      ret.append(tuple(wordArr1))
+      if lenWordArr > 1 and create_suffix_end:
+        wordArr2 = copy.copy(wordArr)
+        wordArr2[-1] = (
+            wordArr2[-1] if len(wordArr2[-1]) <= max_word_len else
+            f'*{wordArr2[-1][len(wordArr2[-1]) - max_word_len + 1:]}')
+        wordArr2 = [w if len(w) <=max_word_len else w[:max_word_len] for w in wordArr2]
+        ret.append(tuple(wordArr2))
     return [list(a) for a in set(ret)]
 
   def add_to_ontology(self, word2ner, max_word_len=None, onto_name=None):
@@ -310,7 +314,7 @@ class OntologyManager:
     if type(word2ner) is dict:
       word2ner = list(word2ner.items())
     lexicon = {}
-    _max_lexicon = self._max_lexicon 
+    _max_lexicon = self._max_lexicon
     for _idx, word_label in enumerate(word2ner):
       _idx += _max_lexicon
       word, label = word_label
@@ -348,17 +352,15 @@ class OntologyManager:
           _label, _idx, _cnt = lexicon.get(key, [label, _idx, {}])
           if _cnt is None: _cnt = {}
           _cnt[label[0]] = _cnt.get(label[0], 0.0) + weight
-          lexicon[key] = [_label, _idx, _cnt]
         else:
           _label, _idx, _cnt = lexicon.get(key, [[label], _idx, {}])
           if _cnt is None: _cnt = {}
           _cnt[label] = _cnt.get(label, 0.0) + weight
-          lexicon[key] = [_label, _idx, _cnt]
+        lexicon[key] = [_label, _idx, _cnt]
         prev_val= ontology.get(wordArr[0], [1, 100])
         ontology[wordArr[0]] = [max(lenWordArr, prev_val[0]), 2 if lenWordArr == 2 else min(max(lenWordArr-1,1), prev_val[1])]
     for key in lexicon:
-      _cnt = lexicon[key][2]
-      if _cnt:
+      if _cnt := lexicon[key][2]:
         label = Counter(_cnt).most_common(1)[0][0]
         lexicon[key][0] = lexicon.get(label, [[label]])[0]
         lexicon[key] = lexicon[key][:-1]
@@ -373,7 +375,7 @@ class OntologyManager:
           rec.append({})
         lexicon2 = rec[2+min(3,slot)]
         if connector in word:
-          word2 = '*'+connector+word.split(connector,1)[1]
+          word2 = f'*{connector}{word.split(connector, 1)[1]}'
         else:
           word2 = word
         lexicon2[word2] = lexicon[(word, slot)]
@@ -391,13 +393,9 @@ class OntologyManager:
       if not words2: 
         words2.append(word)
         continue
-      if not self.cjk_detect(word):
-        if not self.cjk_detect(words2[-1]):
-          if words2[-1] in self.strip_chars_set:
-            words2[-1] += " "+word
-          else:
-            words2[-1] += word
-          continue  
+      if not self.cjk_detect(word) and not self.cjk_detect(words2[-1]):
+        words2[-1] += f" {word}" if words2[-1] in self.strip_chars_set else word
+        continue
       words2.append(word)
     text = " ".join(words2).replace(mt5_underscore," ").replace("  ", " ").replace("  ", " ").strip()
     return text
@@ -411,8 +409,8 @@ class OntologyManager:
       connector = self.connector
     if not supress_cjk_tokenize and self.cjk_detect(word):
       word = self.cjk_pre_tokenize(word, connector)
-    word = word.strip().translate(trannum).strip(self.strip_chars) 
-    wordArr = word.replace(" ",connector).split(connector) 
+    word = word.strip().translate(trannum).strip(self.strip_chars)
+    wordArr = word.replace(" ",connector).split(connector)
     #wordArr = [w2.strip(self.strip_chars) for w2 in wordArr if w2.strip(self.strip_chars)]
     if not wordArr:
       return word, None
@@ -425,15 +423,16 @@ class OntologyManager:
         if shingleArr and shingleArr[0] in ontology:
           lexicon2 = ontology[shingleArr[0]][2+min(3,lenWordArr//(compound_word_step+1))]
           if len(shingleArr) > 1:
-            shingle = '*'+connector+connector.join((shingleArr[1:]))
+            shingle = f'*{connector}{connector.join(shingleArr[1:])}'
           else:
             shingle = shingleArr[0]
           label, _ = lexicon2.get(shingle, (None, None))
           #let's return only labels that are in the upper_ontology
           if label is not None and (label[0] in self.upper_ontology or self.label2label.get(label[0]) in self.upper_ontology):
-            if check_person_org_caps and ("PERSON" in label or "ORG" in label):
-              #ideally we would keep patterns like AaA as part of the shingle to match. This is a hack.
-              if wordArr[0][0] != wordArr[0][0].upper() or  wordArr[-1][0] != wordArr[-1][0].upper(): continue
+            if (check_person_org_caps and ("PERSON" in label or "ORG" in label)
+                and (wordArr[0][0] != wordArr[0][0].upper()
+                     or wordArr[-1][0] != wordArr[-1][0].upper())):
+              continue
             label = label[0]
             label = self.label2label.get(label, label)
             return word, label
@@ -511,9 +510,7 @@ class OntologyManager:
     if re.search("[\u3040-\u30ff]", texts):
         return "ja"
     # chinese
-    if re.search("[\u4e00-\u9FFF]", texts):
-        return "zh"
-    return None
+    return "zh" if re.search("[\u4e00-\u9FFF]", texts) else None
 
 if __name__ == "__main__":  
   data_dir = tmp = None
